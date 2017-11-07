@@ -92,17 +92,23 @@ uint8_t socket_readByte(struct socket* this){
  * not thread-safe
  */
 char* socket_readLine(struct socket* this){
+  printf("ENTER socket_readLine %s\n", this->toString(this));
   char c;
   int len = 0;
   memset(this->_buffer, '\0', SOCKET_BUFFER_LEN * sizeof(char) + 1);
   while(true){
     int r = read(this->fd, &c, 1);
+    if(r < 0){
+      fprintf(stderr, "Couldn't read\n");
+      return NULL;
+    }
     if(c == '\r') continue;
     if(r == 0 || c == '\n'){
       break;
     }
     this->_buffer[len++] = c;
   }
+  printf("EXIT readLine %s\n", this->_buffer);
   return this->_buffer;
 }
 
