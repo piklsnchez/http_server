@@ -109,43 +109,36 @@ struct hash_map* http_server_parseHeaders(struct http_server* this, struct socke
  * caller will need to copy this string
  */
 char* http_server_parseBody(struct http_server* this, struct socket* client){
-  return client->sRead(client);
+  printf("ENTER http_server_parseBody %s %s\n", this->toString(this), client->toString(client));
+  char* result = client->sRead(client);
+  printf("EXIT parseBody %s\n", result);
+  return result;
 }
 
 void http_server_doGet(struct http_server* this, struct socket* client){
   printf("ENTER http_server_doGet %s %s\n", this->toString(this), client->toString(client));
   char* url         = this->request->resource;
-  //char* scheme      = strtok_r(url, "://", &url);
-  //char* host        = strtok_r(url, "/", &url);
   char* page        = strtok_r(url, "?", &url);
+  page++;//starts with a slash
   printf("page: %s\n", page);
   char* queryString = strtok_r(url, "?", &url);
-  DIR* dir          = opendir("./");
-  if(NULL == dir){
-    fprintf(stderr, "Couldn't open directory\n");
+  FILE* file = fopen(page, "r");
+  if(NULL == file){
+    char response[] = "HTTP/1.1 404 Not Found\r\n"
+	              "Content-Length: 0\r\n\r\n";
+    client->sWrite(client, response);
     return;
   }
-  //TODO subfolders
-  struct dirent* entry;
-  while(NULL != (entry = readdir(dir))){
-    int cmp = strcmp(page, entry->d_name);
-    printf("%s (%d)\n", entry->d_name, cmp);
-    if(0 == cmp){
-      FILE* file = fopen(page, "r");
-      printf("opening file %s\n", page);
-      //chunked
-      char buf[CHUNK_SIZE];
-      int r = 0;
-      do{
-        r = fread(buf, sizeof(buf), 1, file);		      
-        printf("fread: %s\n", buf);
-        client->sWrite(client, buf);
-      } while(CHUNK_SIZE == r);     
-      fclose(file);
-      printf("closing file %s\n", page);
-    }
-  }
-  closedir(dir);
+  //chunked
+  char response[] = "HTTP/1.1 200 Ok\r\n"
+	            "Content-Type: text/plan; charset=UTF-8\r\n\r\n";
+  char buf[CHUNK_SIZE];
+  int r = 0;
+  do{
+    r = fread(buf, sizeof(buf), 1, file);
+    client->sWrite(client, buf);
+  } while(CHUNK_SIZE == r);
+  fclose(file);
   printf("EXIT doGet\n");
 }
 

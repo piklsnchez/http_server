@@ -1,11 +1,12 @@
+#include "socket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netdb.h>
-#include "socket.h"
 #include <string.h>
 
 const int SOCKET_PORT        = 1234;
@@ -73,8 +74,16 @@ int socket_accept(struct socket* this, struct sockaddr_in* address){
  * not thread-safe
  */
 char* socket_read(struct socket* this){
-  int r = read(this->fd, this->_buffer, SOCKET_BUFFER_LEN);
+  printf("ENTER socket_read %s\n", this->toString(this));
+  int available;
+  ioctl(this->fd, FIONREAD, &available);
+  printf("%d bytes available\n", available);
+  int r = 0;
+  if(available > 0){
+    r = read(this->fd, this->_buffer, SOCKET_BUFFER_LEN);
+  }
   this->_buffer[r] = '\0';
+  printf("EXIT read %s\n", this->_buffer);
   return this->_buffer;
 }
 
