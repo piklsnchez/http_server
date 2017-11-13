@@ -131,13 +131,25 @@ void http_server_doGet(struct http_server* this, struct socket* client){
   }
   //chunked
   char response[] = "HTTP/1.1 200 Ok\r\n"
-	            "Content-Type: text/plan; charset=UTF-8\r\n\r\n";
-  char buf[CHUNK_SIZE];
+	            "Content-Type: text/plan; charset=UTF-8\r\n"
+		    "Transfer-Encoding: chunked\r\n"
+		    "\r\n";
+  client->sWrite(client, response);
+  char buf[CHUNK_SIZE+3];//trailing \r\n
+  char chunkLen[10];
   int r = 0;
   do{
-    r = fread(buf, sizeof(buf), 1, file);
+    r = fread(buf, 1, CHUNK_SIZE, file);
+    buf[r] = '\r';
+    buf[r+1]   = '\n';
+    buf[r+2] = '\0';
+    sprintf(chunkLen, "%X\r\n", r);
+    printf("r: %d, chunkLen: %s\n", r, chunkLen);
+    client->sWrite(client, chunkLen);
     client->sWrite(client, buf);
   } while(CHUNK_SIZE == r);
+  sprintf(chunkLen, "%X\r\n\r\n", 0);
+  client->sWrite(client, chunkLen);
   fclose(file);
   printf("EXIT doGet\n");
 }
