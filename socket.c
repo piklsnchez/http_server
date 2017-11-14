@@ -74,7 +74,7 @@ int socket_accept(struct socket* this, struct sockaddr_in* address){
  * not thread-safe
  */
 char* socket_read(struct socket* this){
-  printf("ENTER socket_read %s\n", this->toString(this));
+  //printf("ENTER socket_read %s\n", this->toString(this));
   int available;
   ioctl(this->fd, FIONREAD, &available);
   printf("%d bytes available\n", available);
@@ -83,7 +83,7 @@ char* socket_read(struct socket* this){
     r = read(this->fd, this->_buffer, SOCKET_BUFFER_LEN);
   }
   this->_buffer[r] = '\0';
-  printf("EXIT read %s\n", this->_buffer);
+  //printf("EXIT read %s\n", this->_buffer);
   return this->_buffer;
 }
 
@@ -101,7 +101,7 @@ uint8_t socket_readByte(struct socket* this){
  * not thread-safe
  */
 char* socket_readLine(struct socket* this){
-  printf("ENTER socket_readLine %s\n", this->toString(this));
+  //printf("ENTER socket_readLine %s\n", this->toString(this));
   char c;
   int len = 0;
   memset(this->_buffer, '\0', SOCKET_BUFFER_LEN * sizeof(char) + 1);
@@ -117,7 +117,7 @@ char* socket_readLine(struct socket* this){
     }
     this->_buffer[len++] = c;
   }
-  printf("EXIT readLine %s\n", this->_buffer);
+  //printf("EXIT readLine %s\n", this->_buffer);
   return this->_buffer;
 }
 

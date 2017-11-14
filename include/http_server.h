@@ -18,6 +18,7 @@ struct http_server{
   char*                       (*parseBody)(struct http_server* this, struct socket* client);
   void                        (*doGet)(struct http_server* this, struct socket* client);
   void                        (*doPost)(struct http_server* this, struct socket* client);
+  void                        (*doHead)(struct http_server* this, struct socket* client);
   char*                       (*toString)(struct http_server* this);
   void                        (*delete)();
 };
@@ -30,6 +31,7 @@ struct hash_map*            http_server_parseHeaders(struct http_server* this, s
 char*                       http_server_parseBody(struct http_server* this, struct socket* client);
 void                        http_server_doGet(struct http_server* this, struct socket* client);
 void                        http_server_doPost(struct http_server* this, struct socket* client);
+void                        http_server_doHead(struct http_server* this, struct socket* client);
 void                        http_server_delete(struct http_server* this);
 char*                       http_server_toString(struct http_server* this);
 

@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
-#include <dirent.h>
 
 const int CHUNK_SIZE = 1024;
 
@@ -25,6 +24,7 @@ struct http_server* http_server_new1(struct socket* sock){
   this->parseBody    = http_server_parseBody;
   this->doGet        = http_server_doGet;
   this->doPost       = http_server_doPost;
+  this->doHead       = http_server_doHead;
   this->toString     = http_server_toString;
   return this;
 }
@@ -68,6 +68,10 @@ void http_server_start(struct http_server* this){
       this->doGet(this, clientSock);
     } else if(0 == strcmp("POST", req->method)){
       this->doPost(this, clientSock);
+    } else if(0 == strcmp("HEAD", req->method)){
+      this->doHead(this, clientSock);
+    } else {//bad method
+    
     }
   }
 }
@@ -140,8 +144,8 @@ void http_server_doGet(struct http_server* this, struct socket* client){
   int r = 0;
   do{
     r = fread(buf, 1, CHUNK_SIZE, file);
-    buf[r] = '\r';
-    buf[r+1]   = '\n';
+    buf[r]   = '\r';
+    buf[r+1] = '\n';
     buf[r+2] = '\0';
     sprintf(chunkLen, "%X\r\n", r);
     printf("r: %d, chunkLen: %s\n", r, chunkLen);
@@ -155,6 +159,14 @@ void http_server_doGet(struct http_server* this, struct socket* client){
 }
 
 void http_server_doPost(struct http_server* this, struct socket* client){}
+
+//TODO see if file exists and send proper return code
+void http_server_doHead(struct http_server* this, struct socket* client){
+  printf("ENTER http_server_doHead %s %s\n", this->toString(this), client->toString(client));
+  char response[] = "HTTP/1.1 200 Ok\r\n\r\n";
+  client->sWrite(client, response);
+  printf("EXIT doHead\n");
+}
 
 char* trimLeadingSpaces(char* str){
   while('\0' != str[0] && ' ' == str[0]){
