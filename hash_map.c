@@ -46,12 +46,15 @@ struct hash_map* hash_map_put(struct hash_map* this, char* key, char* value){
 char* hash_map_get(struct hash_map* this, char* key){
   struct hash_map_node* current = this->_node;
   while(current != NULL){
-    if(0 == strcmp(current->key, key)){
-      break;
+    printf("cmp: %s: %s\n", current->key, key);
+    if(current->key != NULL){
+      if(0 == strcmp(current->key, key)){
+        break;
+      }
     }
     current = current->next;
   }
-  return current->value;
+  return current == NULL ? NULL : current->value;
 }
 
 /**
