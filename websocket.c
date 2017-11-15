@@ -58,7 +58,7 @@ void websocket_doWebsocket(struct socket* sock){
     result[payload_len] = '\0';
     websocket_sendMessage(sock, result);
   }
-  printf("EXIT doWebsocket\n");
+  printf("EXIT websocket_doWebsocket\n");
 }
 
 /* bits 9 - 15 are message length if less than 126 bit 8 should be 0 */
@@ -76,7 +76,7 @@ void websocket_sendMessage(struct socket* sock, char* msg){
   }
   sock->sWriteBinary(sock, b, b_len);
   sock->sWrite(sock, msg);
-  printf("EXIT sendMessage\n");
+  printf("EXIT websocket_sendMessage\n");
 }
 
 /**
@@ -90,7 +90,7 @@ char* websocket_toBase64(uint8_t* b){
   uint8_t* result   = (uint8_t*)calloc(BASE64_ENCODE_LENGTH(len) + BASE64_ENCODE_FINAL_LENGTH + 1, sizeof(uint8_t));
   int encoded_bytes = base64_encode_update(&ctx, result, len, b);
   encoded_bytes    += base64_encode_final(&ctx, result + encoded_bytes);
-  printf("EXIT toBase64 %s\n", (char*)result);
+  printf("EXIT websocket_toBase64 %s\n", (char*)result);
   return (char*)result;
 }
 
@@ -104,7 +104,7 @@ uint8_t* websocket_sha1(char* data){
   sha1_init(&ctx);
   sha1_update(&ctx, strlen(data), (uint8_t*)data);
   sha1_digest(&ctx, SHA1_DIGEST_SIZE, digest);
-  printf("EXIT sha1 "); websocket_printBinary(digest); putchar('\n');
+  printf("EXIT websocket_sha1 "); websocket_printBinary(digest); putchar('\n');
   return digest;
 }
 

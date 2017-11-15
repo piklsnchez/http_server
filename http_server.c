@@ -58,53 +58,54 @@ void http_server_start(struct http_server* this){
       fprintf(stderr, "%s:%d Couldn't accept\n", __func__, __LINE__);
       return;
     }
-    //pass fd to queue to process async
+    //add client and pass to queue to process async; must ->delete after request
+    struct http_server* client = http_server_new1(socket_new1(fd));
     pthread_t work_queue;
-    pthread_create(&work_queue, NULL,);
-    this->processRequest(this, fd);
+    pthread_create(&work_queue, NULL, client->processRequest, client);
   }
 }
 
-int http_server_processRequest(struct http_server* this, int fd){
-  struct socket* clientSock = socket_new1(fd);
+void* http_server_processRequest(struct http_server* this){
   //request is cached in http_server->request
-  struct http_server_request* req = this->parseRequest(this, clientSock);
+  struct http_server_request* req = this->parseRequest(this);
   //allocated need to headers->delete
-  struct hash_map* headers = this->parseHeaders(this, clientSock);
+  struct hash_map* headers = this->parseHeaders(this);
   //do header stuff
 
   //need to copy this string it's an internal buffer
-  char* body = this->parseBody(this, clientSock);
+  char* body = this->parseBody(this);
   if(0 == strcmp("GET", req->method)){
     char* upgrade = headers->get(headers, "Upgrade");
     if(NULL != upgrade && strcmp("websocket", upgrade) == 0){
-      this->doWebsocket(this, clientSock, headers);
+      this->doWebsocket(this, headers);
     } else {
-      this->doGet(this, clientSock);
+      this->doGet(this);
     }
   } else if(0 == strcmp("POST", req->method)){
-    this->doPost(this, clientSock);
+    this->doPost(this);
   } else if(0 == strcmp("HEAD", req->method)){
-    this->doHead(this, clientSock);
+    this->doHead(this);
   } else {//bad method
   
   }
+  this->delete(this);
   headers->delete(headers);
+  return NULL;
 }
 
 /**
  * called once and in order
  */
-struct http_server_request* http_server_parseRequest(struct http_server* this, struct socket* client){
-  printf("ENTER http_server_parseRequest %s\n", client->toString(client));
-  char* request = client->sReadLine(client);
+struct http_server_request* http_server_parseRequest(struct http_server* this){
+  printf("ENTER http_server_parseRequest\n");
+  char* request = this->sock->sReadLine(this->sock);
   //method 
   strncpy(this->request->method, strtok_r(request, " ", &request), sizeof(this->request->method));
   //resource 
   strncpy(this->request->resource, strtok_r(request, " ", &request), sizeof(this->request->resource));
   //version 
   strncpy(this->request->version, strtok_r(request, " ", &request), sizeof(this->request->version));
-  printf("EXIT parseRequest %s\n", (char*)this->request);
+  printf("EXIT http_server_parseRequest %s\n", (char*)this->request);
   return this->request;
 }
 
@@ -112,15 +113,15 @@ struct http_server_request* http_server_parseRequest(struct http_server* this, s
  * called once and in order
  * caller must call map->delete
  */
-struct hash_map* http_server_parseHeaders(struct http_server* this, struct socket* client){
-  printf("ENTER http_server_parseHeaders %s\n", client->toString(client));
+struct hash_map* http_server_parseHeaders(struct http_server* this){
+  printf("ENTER http_server_parseHeaders\n");
   struct hash_map* headers = hash_map_new();
-  for(char* h = client->sReadLine(client); strlen(h) > 0; h = client->sReadLine(client)){
+  for(char* h = this->sock->sReadLine(this->sock); strlen(h) > 0; h = this->sock->sReadLine(this->sock)){
     char* key   = strtok_r(h, ":", &h);
     char* value = trimLeadingSpaces(strtok_r(h, ":", &h));
     headers->put(headers, key, value);
   }
-  printf("EXIT parseHeaders %s\n", headers->toString(headers));
+  printf("EXIT http_server_parseHeaders %s\n", headers->toString(headers));
   return headers;
 }
 
@@ -128,32 +129,32 @@ struct hash_map* http_server_parseHeaders(struct http_server* this, struct socke
  * called once and in order
  * caller will need to copy this string
  */
-char* http_server_parseBody(struct http_server* this, struct socket* client){
-  printf("ENTER http_server_parseBody %s\n", client->toString(client));
-  char* result = client->sRead(client);
-  printf("EXIT parseBody %s\n", result);
+char* http_server_parseBody(struct http_server* this){
+  printf("ENTER http_server_parseBody\n");
+  char* result = this->sock->sRead(this->sock);
+  printf("EXIT http_server_parseBody %s\n", result);
   return result;
 }
 
-void http_server_doGet(struct http_server* this, struct socket* client){
-  printf("ENTER http_server_doGet %s\n", client->toString(client));
+void http_server_doGet(struct http_server* this){
+  printf("ENTER http_server_doGet\n");
   char* url         = this->request->resource;
   char* page        = strtok_r(url, "?", &url);
   page++;//starts with a slash
   printf("page: %s\n", page);
   char* queryString = strtok_r(url, "?", &url);
-  FILE* file = fopen(page, "r");
+  FILE* file        = fopen(page, "r");
   if(NULL == file){
     char response[] = "HTTP/1.1 404 Not Found\r\n"
 	              "Content-Length: 0\r\n\r\n";
-    client->sWrite(client, response);
+    this->sock->sWrite(this->sock, response);
     return;
   }
   //chunked
   char response[] = "HTTP/1.1 200 Ok\r\n"
 	            "Content-Type: text/plan; charset=UTF-8\r\n"
 		    "Transfer-Encoding: chunked\r\n\r\n";
-  client->sWrite(client, response);
+  this->sock->sWrite(this->sock, response);
   char buf[CHUNK_SIZE+3];//trailing \r\n
   char chunkLen[10];
   int r = 0;
@@ -164,30 +165,30 @@ void http_server_doGet(struct http_server* this, struct socket* client){
     buf[r+2] = '\0';
     sprintf(chunkLen, "%X\r\n", r);
     printf("r: %d, chunkLen: %s\n", r, chunkLen);
-    client->sWrite(client, chunkLen);
-    client->sWrite(client, buf);
+    this->sock->sWrite(this->sock, chunkLen);
+    this->sock->sWrite(this->sock, buf);
   } while(CHUNK_SIZE == r);
   sprintf(chunkLen, "%X\r\n\r\n", 0);
-  client->sWrite(client, chunkLen);
+  this->sock->sWrite(this->sock, chunkLen);
   fclose(file);
-  printf("EXIT doGet\n");
+  printf("EXIT http_server_doGet\n");
 }
 
-void http_server_doPost(struct http_server* this, struct socket* client){}
+void http_server_doPost(struct http_server* this){}
 
 //TODO see if file exists and send proper return code
-void http_server_doHead(struct http_server* this, struct socket* client){
-  printf("ENTER http_server_doHead %s\n", client->toString(client));
+void http_server_doHead(struct http_server* this){
+  printf("ENTER http_server_doHead\n");
   char response[] = "HTTP/1.1 200 Ok\r\n\r\n";
-  client->sWrite(client, response);
+  this->sock->sWrite(this->sock, response);
   printf("EXIT doHead\n");
 }
 
-void http_server_doWebsocket(struct http_server* this, struct socket* client, struct hash_map* headers){
-  printf("ENTERING http_server_doWebsocket %s\n", client->toString(client));
-  websocket_doUpgrade(client, headers);
-  websocket_doWebsocket(client);
-  printf("EXIT doWebsocket\n");
+void http_server_doWebsocket(struct http_server* this, struct hash_map* headers){
+  printf("ENTERING http_server_doWebsocket\n");
+  websocket_doUpgrade(this->sock, headers);
+  websocket_doWebsocket(this->sock);
+  printf("EXIT http_server_doWebsocket\n");
 }
 
 char* trimLeadingSpaces(char* str){

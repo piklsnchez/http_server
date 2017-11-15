@@ -117,7 +117,7 @@ char* socket_readLine(struct socket* this){
     }
     this->_buffer[len++] = c;
   }
-  //printf("EXIT readLine %s\n", this->_buffer);
+  //printf("EXIT socket_readLine %s\n", this->_buffer);
   return this->_buffer;
 }
 

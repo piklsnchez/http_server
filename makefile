@@ -1,5 +1,5 @@
 IDIR=include
-LIBS=-lnettle
+LIBS=-lnettle -lpthread
 CFLAGS=-I$(IDIR) $(LIBS)
 OBJ=http_server.o websocket.o socket.o hash_map.o
 
