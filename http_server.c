@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <pthread.h>
+#include <errno.h>
 
 const int CHUNK_SIZE = 1024;
 
@@ -43,12 +44,12 @@ void http_server_delete(struct http_server* this){
 void http_server_start(struct http_server* this){
   int s = this->sock->sBind(this->sock);
   if(s < 0){
-    fprintf(stderr, "Couldn't bind\n");
+    fprintf(stderr, "%s:%d Couldn't bind: %s\n", __func__, __LINE__, strerror(errno));
     return;
   }
   s = this->sock->sListen(this->sock);
   if(s < 0){
-    fprintf(stderr, "Couldn't listen\n");
+    fprintf(stderr, "%s:%d Couldn't listen: %s\n", __func__, __LINE__, strerror(errno));
     return;
   }
   struct sockaddr_in clientAddress;
@@ -58,7 +59,7 @@ void http_server_start(struct http_server* this){
       fprintf(stderr, "%s:%d Couldn't accept\n", __func__, __LINE__);
       return;
     }
-    //add client and pass to queue to process async; must ->delete after request
+    //add client and pass to queue to process async; must client->delete after request
     struct http_server* client = http_server_new1(socket_new1(fd));
     pthread_t work_queue;
     pthread_create(&work_queue, NULL, client->processRequest, client);
@@ -97,7 +98,7 @@ void* http_server_processRequest(struct http_server* this){
  * called once and in order
  */
 struct http_server_request* http_server_parseRequest(struct http_server* this){
-  printf("ENTER http_server_parseRequest\n");
+  printf("ENTER %s\n", __func__);
   char* request = this->sock->sReadLine(this->sock);
   //method 
   strncpy(this->request->method, strtok_r(request, " ", &request), sizeof(this->request->method));
@@ -105,7 +106,7 @@ struct http_server_request* http_server_parseRequest(struct http_server* this){
   strncpy(this->request->resource, strtok_r(request, " ", &request), sizeof(this->request->resource));
   //version 
   strncpy(this->request->version, strtok_r(request, " ", &request), sizeof(this->request->version));
-  printf("EXIT http_server_parseRequest %s\n", (char*)this->request);
+  printf("EXIT %s %s\n",__func__, (char*)this->request);
   return this->request;
 }
 
@@ -114,14 +115,14 @@ struct http_server_request* http_server_parseRequest(struct http_server* this){
  * caller must call map->delete
  */
 struct hash_map* http_server_parseHeaders(struct http_server* this){
-  printf("ENTER http_server_parseHeaders\n");
+  printf("ENTER %s\n", __func__);
   struct hash_map* headers = hash_map_new();
   for(char* h = this->sock->sReadLine(this->sock); strlen(h) > 0; h = this->sock->sReadLine(this->sock)){
     char* key   = strtok_r(h, ":", &h);
     char* value = trimLeadingSpaces(strtok_r(h, ":", &h));
     headers->put(headers, key, value);
   }
-  printf("EXIT http_server_parseHeaders %s\n", headers->toString(headers));
+  printf("EXIT %s %s\n", __func__, headers->toString(headers));
   return headers;
 }
 
@@ -130,20 +131,20 @@ struct hash_map* http_server_parseHeaders(struct http_server* this){
  * caller will need to copy this string
  */
 char* http_server_parseBody(struct http_server* this){
-  printf("ENTER http_server_parseBody\n");
+  printf("ENTER %s\n", __func__);
   char* result = this->sock->sRead(this->sock);
-  printf("EXIT http_server_parseBody %s\n", result);
+  printf("EXIT %s %s\n",__func__, result);
   return result;
 }
 
 void http_server_doGet(struct http_server* this){
-  printf("ENTER http_server_doGet\n");
+  printf("ENTER %s\n", __func__);
   char* url         = this->request->resource;
   char* page        = strtok_r(url, "?", &url);
   page++;//starts with a slash
   printf("page: %s\n", page);
   char* queryString = strtok_r(url, "?", &url);
-  FILE* file        = fopen(page, "r");
+  FILE* file        = fopen(page, "rb");
   if(NULL == file){
     char response[] = "HTTP/1.1 404 Not Found\r\n"
 	              "Content-Length: 0\r\n\r\n";
@@ -152,43 +153,42 @@ void http_server_doGet(struct http_server* this){
   }
   //chunked
   char response[] = "HTTP/1.1 200 Ok\r\n"
-	            "Content-Type: text/plan; charset=UTF-8\r\n"
+	            "Content-Type: text/html; charset=UTF-8\r\n"
 		    "Transfer-Encoding: chunked\r\n\r\n";
   this->sock->sWrite(this->sock, response);
-  char buf[CHUNK_SIZE+3];//trailing \r\n
+  char buf[CHUNK_SIZE+2];//trailing \r\n
   char chunkLen[10];
   int r = 0;
   do{
     r = fread(buf, 1, CHUNK_SIZE, file);
     buf[r]   = '\r';
     buf[r+1] = '\n';
-    buf[r+2] = '\0';
     sprintf(chunkLen, "%X\r\n", r);
-    printf("r: %d, chunkLen: %s\n", r, chunkLen);
+    //printf("r: %d, chunkLen: %s\n", r, chunkLen);
     this->sock->sWrite(this->sock, chunkLen);
-    this->sock->sWrite(this->sock, buf);
+    this->sock->sWriteBinary(this->sock, (uint8_t*)buf, r+2);
   } while(CHUNK_SIZE == r);
   sprintf(chunkLen, "%X\r\n\r\n", 0);
   this->sock->sWrite(this->sock, chunkLen);
   fclose(file);
-  printf("EXIT http_server_doGet\n");
+  printf("EXIT %s\n", __func__);
 }
 
 void http_server_doPost(struct http_server* this){}
 
 //TODO see if file exists and send proper return code
 void http_server_doHead(struct http_server* this){
-  printf("ENTER http_server_doHead\n");
+  printf("ENTER %s\n", __func__);
   char response[] = "HTTP/1.1 200 Ok\r\n\r\n";
   this->sock->sWrite(this->sock, response);
-  printf("EXIT doHead\n");
+  printf("EXIT %s\n", __func__);
 }
 
 void http_server_doWebsocket(struct http_server* this, struct hash_map* headers){
-  printf("ENTERING http_server_doWebsocket\n");
+  printf("ENTER %s\n", __func__);
   websocket_doUpgrade(this->sock, headers);
   websocket_doWebsocket(this->sock);
-  printf("EXIT http_server_doWebsocket\n");
+  printf("EXIT %s\n", __func__);
 }
 
 char* trimLeadingSpaces(char* str){

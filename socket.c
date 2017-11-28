@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <netdb.h>
 #include <string.h>
+#include <errno.h>
 
 const int SOCKET_PORT        = 1234;
 const int SOCKET_BACKLOG_LEN = 4;
@@ -46,7 +47,7 @@ struct socket* socket_new1(int fd){
 int socket_connect(struct socket* this, const char* hostName, int port){
   struct hostent* host = gethostbyname(hostName);
   if(NULL == host){
-    fprintf(stderr, "host not found\n");
+    fprintf(stderr, "%s:%d host not found\n", __func__, __LINE__);
     exit(0);
   }
   struct sockaddr_in serverAddress;
@@ -108,7 +109,7 @@ char* socket_readLine(struct socket* this){
   while(true){
     int r = read(this->fd, &c, 1);
     if(r < 0){
-      fprintf(stderr, "Couldn't read\n");
+      fprintf(stderr, "%s:%d Couldn't read\n", __func__, __LINE__);
       return NULL;
     }
     if(c == '\r') continue;
@@ -124,14 +125,14 @@ char* socket_readLine(struct socket* this){
 void socket_write(struct socket* this, char* message){
   int s = write(this->fd, message, strlen(message));
   if(s < 0){
-    fprintf(stderr, "Couldn't write\n");
+    fprintf(stderr, "%s:%d Couldn't write: %s\n", __func__, __LINE__, strerror(errno));
   }
 }
 
 void socket_writeBinary(struct socket* this, uint8_t* data, int len){
   int s = write(this->fd, data, len);
   if(s < 0){
-    fprintf(stderr, "Couldn't write\n");
+    fprintf(stderr, "%s:%d Couldn't write: %s\n", __func__, __LINE__, strerror(errno));
   }
 }
 
